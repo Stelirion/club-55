@@ -1,0 +1,13 @@
+services:
+  laverie:
+    build: .
+    container_name: club55-laverie
+    ports:
+      - "8080:5000"
+    volumes:
+      - ./data:/data
+    environment:
+      DB_PATH: /data/laundry.db
+      TZ: Europe/Paris
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+    restart: unless-stopped

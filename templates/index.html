@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>Laverie Club 55</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --green: #22c55e;
+      --green-bg: #14532d;
+      --red: #ef4444;
+      --red-bg: #7f1d1d;
+      --accent: #38bdf8;
+      --border: #334155;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+
+    .container { max-width: 800px; margin: 0 auto; }
+
+    header { text-align: center; margin-bottom: 1.5rem; }
+    header h1 { font-size: 1.75rem; margin-bottom: 0.25rem; }
+    header p { color: var(--muted); font-size: 0.95rem; }
+
+    .tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.35rem;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 0.65rem 1rem;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .tab.active {
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    .machines { display: grid; gap: 1rem; }
+
+    .machine {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.25rem;
+    }
+
+    .machine.available { border-left: 4px solid var(--green); }
+    .machine.busy { border-left: 4px solid var(--red); }
+
+    .machine-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .machine-icon { font-size: 2rem; }
+    .machine-title { font-size: 1.25rem; font-weight: 600; }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.65rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .badge.available { background: var(--green-bg); color: var(--green); }
+    .badge.busy { background: var(--red-bg); color: var(--red); }
+
+    .machine-info {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-bottom: 1rem;
+      line-height: 1.5;
+    }
+
+    .timer {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+      margin-bottom: 0.5rem;
+    }
+
+    .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+    button {
+      padding: 0.65rem 1.1rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+
+    button:active { transform: scale(0.98); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-start { background: var(--green); color: #052e16; }
+    .btn-in-progress {
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+    }
+
+    .btn-release {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    .heatmap-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.25rem;
+    }
+
+    .heatmap-wrap {
+      overflow-x: auto;
+      margin-bottom: 0.75rem;
+    }
+
+    .heatmap {
+      display: grid;
+      grid-template-columns: 2.5rem repeat(24, minmax(1.1rem, 1fr));
+      gap: 2px;
+      min-width: 520px;
+    }
+
+    .heatmap-corner { min-height: 1.25rem; }
+
+    .heatmap-hour-label {
+      font-size: 0.6rem;
+      color: var(--muted);
+      text-align: center;
+      padding-bottom: 0.15rem;
+    }
+
+    .heatmap-day-label {
+      font-size: 0.7rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      padding-right: 0.35rem;
+    }
+
+    .heatmap-cell {
+      aspect-ratio: 1;
+      border-radius: 3px;
+      min-height: 1.1rem;
+      cursor: default;
+    }
+
+    .heatmap-cell.level-high { background: var(--green); }
+    .heatmap-cell.level-medium { background: var(--accent); }
+    .heatmap-cell.level-low { background: #334155; }
+
+    .heatmap-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1.25rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .heatmap-legend span::before {
+      content: '';
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      margin-right: 0.35rem;
+      vertical-align: middle;
+    }
+
+    .heatmap-legend .high::before { background: var(--green); }
+    .heatmap-legend .medium::before { background: var(--accent); }
+    .heatmap-legend .low::before { background: #334155; }
+
+    .stats-empty {
+      color: var(--muted);
+      text-align: center;
+      padding: 2rem 1rem;
+    }
+
+    .sync-status {
+      text-align: center;
+      margin-top: 1.5rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .site-footer {
+      margin-top: 2.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    .site-footer p {
+      max-width: 36rem;
+      margin: 0 auto 0.75rem;
+    }
+
+    .site-footer a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .site-footer a:hover {
+      text-decoration: underline;
+    }
+
+    .sync-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      margin-right: 0.4rem;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .error-toast {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--red-bg);
+      color: #fecaca;
+      padding: 0.75rem 1.25rem;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      display: none;
+      z-index: 100;
+      max-width: 90vw;
+      text-align: center;
+    }
+
+    .error-toast.show { display: block; }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.75);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      z-index: 200;
+    }
+
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.25rem;
+      width: 100%;
+      max-width: 360px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+    }
+
+    .modal-message {
+      color: var(--text);
+      font-size: 0.95rem;
+      line-height: 1.5;
+      margin-bottom: 1rem;
+    }
+
+    .modal-input {
+      width: 100%;
+      padding: 0.65rem 0.85rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .modal-input:focus {
+      outline: 2px solid var(--accent);
+      border-color: transparent;
+    }
+
+    .modal-input[hidden] { display: none; }
+
+    .modal-actions {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
+    }
+
+    .btn-modal-cancel {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    .btn-modal-ok {
+      background: var(--accent);
+      color: #0c4a6e;
+    }
+
+    .btn-modal-danger {
+      background: var(--red);
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🧺 Laverie Club 55</h1>
+      <p>{% for machine in machines.values() %}{{ machine.name }} ({{ machine.cycle_minutes }} min){% if not loop.last %} · {% endif %}{% endfor %}</p>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-tab="availability">Disponibilité</button>
+      <button class="tab" data-tab="stats">Stats</button>
+    </nav>
+
+    <section class="panel active" id="panel-availability">
+      <div class="machines" id="machines"></div>
+      <div class="sync-status">
+        <span class="sync-dot"></span>
+        Mise à jour automatique · dernière sync <span id="lastSync">—</span>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-stats">
+      <div id="statsContent">
+        <p class="stats-empty">Chargement des statistiques…</p>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      <p>
+        Petit outil fait par un résident pour qu'on sache si la laverie est libre.
+        Si tu démarres un cycle, pense à le noter ici et à libérer la machine quand tu as fini —
+        comme ça tout le monde peut s'organiser.
+      </p>
+      <p>Merci à ceux qui jouent le jeu.</p>
+      <a href="https://github.com/Stelirion" target="_blank" rel="noopener noreferrer">github.com/Stelirion</a>
+    </footer>
+  </div>
+
+  <div class="error-toast" id="errorToast"></div>
+
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal" role="dialog" aria-modal="true">
+      <p class="modal-message" id="modalMessage"></p>
+      <input type="number" class="modal-input" id="modalInput" min="1" step="1" inputmode="decimal" hidden>
+      <div class="modal-actions">
+        <button type="button" class="btn-modal-cancel" id="modalCancel">Annuler</button>
+        <button type="button" class="btn-modal-ok" id="modalOk">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const machinesEl = document.getElementById('machines');
+    const lastSyncEl = document.getElementById('lastSync');
+    const errorToast = document.getElementById('errorToast');
+    const statsContent = document.getElementById('statsContent');
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+    const modalOverlay = document.getElementById('modalOverlay');
+    const modalMessage = document.getElementById('modalMessage');
+    const modalInput = document.getElementById('modalInput');
+    const modalOk = document.getElementById('modalOk');
+    const modalCancel = document.getElementById('modalCancel');
+
+    let statusInterval = null;
+    let activeTab = 'availability';
+    let modalKeyHandler = null;
+
+    function apiFetch(url, options = {}) {
+      const headers = { ...(options.headers || {}) };
+      if (options.method === 'POST') {
+        headers['X-CSRFToken'] = csrfToken;
+        headers['Content-Type'] = 'application/json';
+      }
+      return fetch(url, { ...options, headers });
+    }
+
+    function openModal({ message, mode = 'confirm', okLabel = 'OK', cancelLabel = 'Annuler', danger = false }) {
+      return new Promise((resolve) => {
+        modalMessage.textContent = message;
+        modalInput.hidden = mode !== 'prompt';
+        modalInput.value = '';
+        modalOk.textContent = okLabel;
+        modalCancel.textContent = cancelLabel;
+        modalOk.className = danger ? 'btn-modal-ok btn-modal-danger' : 'btn-modal-ok';
+        modalOverlay.classList.add('open');
+
+        const close = (result) => {
+          modalOverlay.classList.remove('open');
+          modalOk.onclick = null;
+          modalCancel.onclick = null;
+          modalOverlay.onclick = null;
+          if (modalKeyHandler) {
+            document.removeEventListener('keydown', modalKeyHandler);
+            modalKeyHandler = null;
+          }
+          resolve(result);
+        };
+
+        modalKeyHandler = (e) => {
+          if (e.key === 'Escape') close(mode === 'prompt' ? null : false);
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            close(mode === 'prompt' ? modalInput.value : true);
+          }
+        };
+
+        modalOk.onclick = () => close(mode === 'prompt' ? modalInput.value : true);
+        modalCancel.onclick = () => close(mode === 'prompt' ? null : false);
+        modalOverlay.onclick = (e) => {
+          if (e.target === modalOverlay) close(mode === 'prompt' ? null : false);
+        };
+        document.addEventListener('keydown', modalKeyHandler);
+
+        if (mode === 'prompt') setTimeout(() => modalInput.focus(), 0);
+      });
+    }
+
+    function showConfirm(message, { okLabel = 'OK', danger = false } = {}) {
+      return openModal({ message, mode: 'confirm', okLabel, danger });
+    }
+
+    function showPrompt(message, { okLabel = 'Valider' } = {}) {
+      return openModal({ message, mode: 'prompt', okLabel });
+    }
+
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        activeTab = tab.dataset.tab;
+        document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === activeTab));
+        document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === `panel-${activeTab}`));
+        if (activeTab === 'stats') fetchStats();
+        managePolling();
+      });
+    });
+
+    function managePolling() {
+      if (statusInterval) clearInterval(statusInterval);
+      if (activeTab === 'availability') {
+        fetchStatus();
+        statusInterval = setInterval(fetchStatus, 5000);
+      }
+    }
+
+    function formatTime(seconds) {
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function showError(msg) {
+      errorToast.textContent = msg;
+      errorToast.classList.add('show');
+      setTimeout(() => errorToast.classList.remove('show'), 4000);
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function renderStats(data) {
+      if (data.total_cycles === 0) {
+        statsContent.innerHTML = '<p class="stats-empty">Pas encore de données sur le dernier mois.</p>';
+        return;
+      }
+
+      const cellMap = {};
+      data.cells.forEach(c => { cellMap[`${c.weekday}-${c.hour}`] = c; });
+
+      const hourLabels = Array.from({ length: 24 }, (_, h) =>
+        `<div class="heatmap-hour-label">${h % 2 === 0 ? h + 'h' : ''}</div>`
+      ).join('');
+
+      const rows = data.weekday_labels.map((day, weekday) => {
+        const cells = Array.from({ length: 24 }, (_, hour) => {
+          const cell = cellMap[`${weekday}-${hour}`];
+          const title = `${day} ${hour}h — ${cell.count} cycle${cell.count > 1 ? 's' : ''} — ${cell.usage_label}`;
+          return `<div class="heatmap-cell level-${cell.usage_level}" title="${title}"></div>`;
+        }).join('');
+        return `<div class="heatmap-day-label">${day}</div>${cells}`;
+      }).join('');
+
+      statsContent.innerHTML = `
+        <div class="heatmap-card">
+          <div class="heatmap-wrap">
+            <div class="heatmap">
+              <div class="heatmap-corner"></div>
+              ${hourLabels}
+              ${rows}
+            </div>
+          </div>
+          <div class="heatmap-legend">
+            <span class="high">Généralement utilisé</span>
+            <span class="medium">Usage modéré</span>
+            <span class="low">Peu utilisé</span>
+          </div>
+        </div>`;
+    }
+
+    function renderMachines(machines) {
+      machinesEl.innerHTML = machines.map(m => {
+        const isBusy = m.in_use;
+        const info = isBusy ? 'Cycle en cours' : 'Disponible — vous pouvez démarrer un cycle';
+        return `
+          <div class="machine ${isBusy ? 'busy' : 'available'}" data-id="${m.id}">
+            <div class="machine-header">
+              <span class="machine-icon">${m.icon}</span>
+              <span class="machine-title">${escapeHtml(m.name)}</span>
+              <span class="badge ${isBusy ? 'busy' : 'available'}">${isBusy ? 'Occupé' : 'Libre'}</span>
+            </div>
+            ${isBusy ? `<div class="timer" data-remaining="${m.remaining_seconds}">${formatTime(m.remaining_seconds)}</div>` : ''}
+            <div class="machine-info">${info}</div>
+            <div class="actions">
+              ${!isBusy ? `<button class="btn-start" onclick="startMachine('${m.id}')">J'utilise cette machine</button>` : ''}
+              ${!isBusy ? `<button class="btn-in-progress" onclick="startInProgressMachine('${m.id}', ${m.max_remaining_minutes})">Machine déjà en cours</button>` : ''}
+              ${isBusy ? `<button class="btn-release" onclick="releaseMachine('${m.id}', '${escapeHtml(m.name)}')">Libérer la machine</button>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function fetchStatus() {
+      try {
+        const res = await apiFetch('/api/status');
+        const data = await res.json();
+        renderMachines(data.machines);
+        lastSyncEl.textContent = new Date().toLocaleTimeString('fr-FR');
+      } catch {
+        lastSyncEl.textContent = 'erreur';
+      }
+    }
+
+    async function fetchStats() {
+      try {
+        const res = await apiFetch('/api/stats');
+        const data = await res.json();
+        if (!res.ok) {
+          statsContent.innerHTML = `<p class="stats-empty">${data.error || 'Erreur'}</p>`;
+          return;
+        }
+        renderStats(data);
+      } catch {
+        statsContent.innerHTML = '<p class="stats-empty">Connexion impossible.</p>';
+      }
+    }
+
+    async function startMachine(machineId, remainingMinutes = null) {
+      try {
+        const body = { machine_id: machineId };
+        if (remainingMinutes !== null) body.remaining_minutes = remainingMinutes;
+
+        const res = await apiFetch('/api/start', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showError(data.error || 'Erreur');
+          return;
+        }
+        renderMachines(data.machines);
+      } catch {
+        showError('Connexion impossible.');
+      }
+    }
+
+    async function startInProgressMachine(machineId, maxRemaining) {
+      const input = await showPrompt('Temps restant en minutes ?');
+      if (input === null) return;
+
+      const remaining = parseFloat(String(input).trim().replace(',', '.'));
+      if (!Number.isFinite(remaining) || remaining <= 0 || remaining > maxRemaining) {
+        showError(`Entre 1 et ${maxRemaining} minutes.`);
+        return;
+      }
+
+      startMachine(machineId, remaining);
+    }
+
+    async function releaseMachine(machineId, machineName) {
+      const confirmed = await showConfirm(
+        `Libérer ${machineName} ? Le cycle en cours sera arrêté.`,
+        { okLabel: 'Libérer', danger: true }
+      );
+      if (!confirmed) return;
+      try {
+        const res = await apiFetch('/api/release', {
+          method: 'POST',
+          body: JSON.stringify({ machine_id: machineId }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showError(data.error || 'Erreur');
+          return;
+        }
+        renderMachines(data.machines);
+      } catch {
+        showError('Connexion impossible.');
+      }
+    }
+
+    setInterval(() => {
+      document.querySelectorAll('.timer').forEach(el => {
+        let remaining = parseInt(el.dataset.remaining, 10);
+        if (remaining > 0) {
+          remaining--;
+          el.dataset.remaining = remaining;
+          el.textContent = formatTime(remaining);
+        }
+      });
+    }, 1000);
+
+    managePolling();
+  </script>
+</body>
+</html>
