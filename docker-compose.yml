@@ -3,7 +3,7 @@ services:
     build: .
     container_name: club55-laverie
     ports:
-      - "8080:5000"
+      - "4242:5000"
     volumes:
       - ./data:/data
     environment:
